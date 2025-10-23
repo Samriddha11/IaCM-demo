@@ -27,7 +27,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
 
   rule {
     apply_server_side_encryption_by_default {
-      # We use AES256 (SSE-S3) as the default minimum
+      # SSE-S3 encryption is the required minimum standard
       sse_algorithm = "AES256" 
     }
   }
@@ -43,4 +43,31 @@ resource "aws_s3_bucket_public_access_block" "this" {
   ignore_public_acls      = true
   block_public_policy     = true
   restrict_public_buckets = true
+}
+
+# 5. Enforce LIFECYCLE CONFIGURATION (OPA Policy Check 4: Must exist and be Enabled)
+resource "aws_s3_bucket_lifecycle_configuration" "this" {
+  # References the main bucket ID
+  bucket = aws_s3_bucket.this.id
+
+  rule {
+    id     = "version-management"
+    status = "Enabled" # <-- Lifecycle rule status must be Enabled
+
+    # Rule 1: Transition non-current (old) versions to lower cost storage after 30 days
+    noncurrent_version_transition {
+      noncurrent_days = 30
+      storage_class   = "STANDARD_IA" # Infrequent Access
+    }
+    
+    # Rule 2: Permanently delete non-current versions after 90 days
+    noncurrent_version_expiration {
+      noncurrent_days = 90
+    }
+
+    # Rule 3: Permanently delete objects themselves after 365 days (for current versions)
+    expiration {
+      days = 365 
+    }
+  }
 }
