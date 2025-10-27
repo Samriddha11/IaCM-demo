@@ -1,78 +1,62 @@
-# main.tf
-
 provider "aws" {
   region = var.region
 }
 
-# ---------------------------------------------
-# S3 Bucket (All configurations unified)
-# ---------------------------------------------
+# 1. The Core S3 Bucket Resource
 resource "aws_s3_bucket" "this" {
   bucket = var.bucket_name
   tags   = var.tags
+}
 
-  # ✅ Enforce versioning
-  versioning {
-    enabled = true
+# 2. Enforce VERSIONING (OPA Policy Check 1: Status must be "Enabled")
+resource "aws_s3_bucket_versioning" "this" {
+  bucket = aws_s3_bucket.this.id
+
+  versioning_configuration {
+    status = "Enabled"
   }
+}
 
-  # ✅ Enforce default encryption
-  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm     = "aws:kms"   # Better than AES256
-        kms_master_key_id = "alias/aws/s3" # Default AWS-managed KMS key
-      }
+# 3. Enforce DEFAULT ENCRYPTION (OPA Policy Check 2: Algorithm must be AES256 or aws:kms)
+resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
+  bucket = aws_s3_bucket.this.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
     }
   }
+}
 
-  # ✅ Enforce lifecycle management
-  lifecycle_rule {
-    id      = "version-management"
-    enabled = true
+# 4. Enforce BLOCK PUBLIC ACCESS (OPA Policy Check 3: All four fields must be true)
+resource "aws_s3_bucket_public_access_block" "this" {
+  bucket = aws_s3_bucket.this.id
 
-    # Transition old versions to infrequent access after 30 days
+  block_public_acls       = true
+  ignore_public_acls      = true
+  block_public_policy     = true
+  restrict_public_buckets = true
+}
+
+# 5. Enforce LIFECYCLE CONFIGURATION (OPA Policy Check 4: Must exist and be Enabled)
+resource "aws_s3_bucket_lifecycle_configuration" "this" {
+  bucket = aws_s3_bucket.this.id
+
+  rule {
+    id     = "version-management"
+    status = "Enabled"
+
     noncurrent_version_transition {
-      days          = 30
-      storage_class = "STANDARD_IA"
+      noncurrent_days = 30
+      storage_class   = "STANDARD_IA"
     }
 
-    # Delete non-current versions after 90 days
     noncurrent_version_expiration {
-      days = 90
+      noncurrent_days = 90
     }
 
-    # Expire current objects after 365 days
     expiration {
       days = 365
     }
-  }
-
-  # ✅ Block all public access
-  public_access_block_configuration {
-    block_public_acls       = true
-    ignore_public_acls      = true
-    block_public_policy     = true
-    restrict_public_buckets = true
-  }
-}
-💡 Variables (vars.tf)
-variable "region" {
-  description = "AWS region where the S3 bucket will be created"
-  type        = string
-  default     = "us-east-1"
-}
-
-variable "bucket_name" {
-  description = "Unique name for the S3 bucket"
-  type        = string
-}
-
-variable "tags" {
-  description = "Tags to apply to the S3 bucket"
-  type        = map(string)
-  default = {
-    Environment = "dev"
-    ManagedBy   = "Terraform"
   }
 }
