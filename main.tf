@@ -6,27 +6,17 @@ provider "aws" {
 resource "aws_s3_bucket" "this" {
   bucket = var.bucket_name
   tags   = var.tags
-}
 
-# 2. Enforce VERSIONING (OPA Policy Check 1: Status must be "Enabled")
-resource "aws_s3_bucket_versioning" "this" {
-  bucket = aws_s3_bucket.this.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-# 3. Enforce DEFAULT ENCRYPTION (OPA Policy Check 2: Algorithm must be AES256 or aws:kms)
-resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
-  bucket = aws_s3_bucket.this.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm     = "aws:kms"   # Better than AES256
+        kms_master_key_id = "alias/aws/s3" # Default AWS-managed KMS key
+      }
     }
   }
 }
+
 
 # 4. Enforce BLOCK PUBLIC ACCESS (OPA Policy Check 3: All four fields must be true)
 resource "aws_s3_bucket_public_access_block" "this" {
