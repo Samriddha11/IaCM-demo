@@ -1,14 +1,8 @@
 provider "aws" {
   region = var.region
 }
-resource "aws_s3_bucket_public_access_block" "this" {
-  bucket = aws_s3_bucket.this.id
 
-  block_public_acls       = true
-  ignore_public_acls      = true
-  block_public_policy     = true
-  restrict_public_buckets = true
-}
+# Core S3 bucket resource
 resource "aws_s3_bucket" "this" {
   bucket = var.bucket_name
   tags   = var.tags
@@ -18,7 +12,7 @@ resource "aws_s3_bucket" "this" {
     enabled = true
   }
 
-  # Lifecycle management
+  # Enable lifecycle management
   lifecycle_rule {
     id      = "version-management"
     enabled = true
@@ -37,6 +31,7 @@ resource "aws_s3_bucket" "this" {
     }
   }
 
+  # Enable server-side encryption with KMS
   server_side_encryption_configuration {
     rule {
       apply_server_side_encryption_by_default {
@@ -45,4 +40,14 @@ resource "aws_s3_bucket" "this" {
       }
     }
   }
+}
+
+# Enforce public access block (REQUIRED for OPA compliance)
+resource "aws_s3_bucket_public_access_block" "this" {
+  bucket = aws_s3_bucket.this.id
+
+  block_public_acls       = true
+  ignore_public_acls      = true
+  block_public_policy     = true
+  restrict_public_buckets = true
 }
