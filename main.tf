@@ -10,6 +10,12 @@ resource "aws_s3_bucket" "this" {
   versioning {
     enabled = true
   }
+  public_access_block_configuration {
+    block_public_acls       = true
+    ignore_public_acls      = true
+    block_public_policy     = true
+    restrict_public_buckets = true
+  }
 
   # Lifecycle management
   lifecycle_rule {
